@@ -512,16 +512,16 @@ function createCategoryRow(category, visibleItems) {
   row.innerHTML = `
     <td colspan="10">
       <div class="category-layout">
-        <span class="drag-handle" draggable="true" title="拖曳調整大項排序" aria-label="拖曳調整大項排序">⋮</span>
+        <span class="drag-handle" draggable="true" title="調整大項排序" aria-label="調整大項排序">⋮</span>
         <button class="category-toggle" type="button" aria-expanded="${expanded}" title="展開或收合">
-          <span class="chevron">${expanded ? "v" : ">"}</span>
+          <span class="chevron" aria-hidden="true"></span>
         </button>
         <strong class="category-number">${categoryNumber(category)}</strong>
         <input class="category-name-input" type="text" value="${escapeHtml(category)}" />
         <span class="category-count">${count} 項細項</span>
         <b class="category-total">${money(total)}</b>
         <button class="soft-button add-category-item" type="button">新增細項</button>
-        <button class="text-action-button delete-category" type="button">刪除大項</button>
+        <button class="text-action-button delete-category" type="button">刪除</button>
       </div>
     </td>
   `;
