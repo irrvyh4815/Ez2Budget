@@ -561,7 +561,7 @@ button:disabled {
 .category-layout {
   min-height: 52px;
   display: grid;
-  grid-template-columns: 58px 42px 56px minmax(220px, 1fr) 112px 150px auto auto;
+  grid-template-columns: 34px 42px 56px minmax(220px, 1fr) 112px 150px auto auto;
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
@@ -579,14 +579,20 @@ button:disabled {
 .drag-handle {
   display: grid;
   place-items: center;
-  min-height: 32px;
-  border: 1px solid var(--line-strong);
+  width: 30px;
+  height: 34px;
+  border: 0;
   border-radius: 6px;
   color: var(--accent-dark);
-  background: #fff;
+  background: transparent;
   cursor: grab;
-  font-size: 13px;
-  font-weight: 850;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.drag-handle:hover {
+  background: rgba(13, 107, 99, 0.12);
 }
 
 .drag-handle:active {
@@ -729,9 +735,8 @@ button:disabled {
 }
 
 .row-actions {
-  display: flex;
-  justify-content: center;
-  gap: 7px;
+  position: relative;
+  text-align: center;
 }
 
 .text-action-button {
@@ -746,6 +751,44 @@ button:disabled {
 
 .text-action-button:hover {
   border-color: var(--line-strong);
+  background: var(--surface-muted);
+}
+
+.row-action-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.action-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 5;
+  min-width: 112px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 14px 30px rgba(24, 42, 39, 0.14);
+}
+
+.action-menu[hidden] {
+  display: none;
+}
+
+.action-menu-item {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  padding: 8px 12px;
+  color: var(--text);
+  background: #fff;
+  text-align: left;
+  font-weight: 800;
+}
+
+.action-menu-item:hover {
   background: var(--surface-muted);
 }
 

@@ -211,8 +211,13 @@
         </td>
         <td class="line-total">$0</td>
         <td class="row-actions">
-          <button class="text-action-button duplicate-row" type="button">複製</button>
-          <button class="text-action-button delete-row" type="button">刪除</button>
+          <div class="row-action-menu">
+            <button class="text-action-button action-menu-toggle" type="button" aria-expanded="false">操作</button>
+            <div class="action-menu" hidden>
+              <button class="action-menu-item duplicate-row" type="button">複製</button>
+              <button class="action-menu-item delete-row" type="button">刪除</button>
+            </div>
+          </div>
         </td>
       </tr>
     </template>

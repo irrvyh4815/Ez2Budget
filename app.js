@@ -483,6 +483,25 @@ function updateSelectionControls() {
   els.selectAllItems.indeterminate = !allVisibleSelected && visibleIds.some((id) => selectedItemIds.has(id));
 }
 
+function closeActionMenus(exceptMenu = null) {
+  document.querySelectorAll(".row-action-menu").forEach((menu) => {
+    if (menu === exceptMenu) {
+      return;
+    }
+    menu.classList.remove("is-open");
+    menu.querySelector(".action-menu").hidden = true;
+    menu.querySelector(".action-menu-toggle").setAttribute("aria-expanded", "false");
+  });
+}
+
+function toggleActionMenu(menu) {
+  const isOpen = menu.classList.contains("is-open");
+  closeActionMenus(menu);
+  menu.classList.toggle("is-open", !isOpen);
+  menu.querySelector(".action-menu").hidden = isOpen;
+  menu.querySelector(".action-menu-toggle").setAttribute("aria-expanded", String(!isOpen));
+}
+
 function createCategoryRow(category, visibleItems) {
   const row = document.createElement("tr");
   row.className = "category-row";
@@ -492,8 +511,8 @@ function createCategoryRow(category, visibleItems) {
   const expanded = state.expandedCategories[category];
   row.innerHTML = `
     <td colspan="10">
-      <div class="category-layout" draggable="true">
-        <span class="drag-handle" title="拖曳調整大項排序">拖曳</span>
+      <div class="category-layout">
+        <span class="drag-handle" draggable="true" title="拖曳調整大項排序" aria-label="拖曳調整大項排序">⋮</span>
         <button class="category-toggle" type="button" aria-expanded="${expanded}" title="展開或收合">
           <span class="chevron">${expanded ? "v" : ">"}</span>
         </button>
@@ -1099,6 +1118,16 @@ function bindEvents() {
   });
 
   els.itemsBody.addEventListener("click", (event) => {
+    const actionMenu = event.target.closest(".row-action-menu");
+    if (event.target.closest(".action-menu-toggle") && actionMenu) {
+      toggleActionMenu(actionMenu);
+      return;
+    }
+
+    if (!event.target.closest(".action-menu")) {
+      closeActionMenus();
+    }
+
     const categoryRow = event.target.closest(".category-row");
     if (categoryRow && event.target.closest(".delete-category")) {
       deleteCategory(categoryRow.dataset.category);
@@ -1125,10 +1154,12 @@ function bindEvents() {
 
     const index = Number(row.dataset.index);
     if (event.target.closest(".delete-row")) {
+      closeActionMenus();
       deleteItem(index);
     }
 
     if (event.target.closest(".duplicate-row")) {
+      closeActionMenus();
       duplicateItem(index);
     }
 
