@@ -167,13 +167,13 @@
             <table class="budget-table">
               <thead>
                 <tr>
+                  <th class="col-code">編號</th>
                   <th class="col-select">
                     <label class="select-all-label">
                       <input id="selectAllItems" type="checkbox" aria-label="選取全部細項" />
                       <span>全選</span>
                     </label>
                   </th>
-                  <th class="col-code">編碼</th>
                   <th>細項名稱</th>
                   <th>用料 / 規格</th>
                   <th class="col-unit">單位</th>
@@ -195,8 +195,8 @@
 
     <template id="itemRowTemplate">
       <tr class="detail-row">
-        <td><input class="item-select" type="checkbox" aria-label="選取細項" /></td>
         <td><input class="item-code" type="text" /></td>
+        <td><input class="item-select" type="checkbox" aria-label="選取細項" /></td>
         <td><input class="item-name" type="text" /></td>
         <td><input class="item-material" type="text" /></td>
         <td><input class="item-unit" type="text" /></td>

@@ -492,17 +492,18 @@ function createCategoryRow(category, visibleItems) {
   const expanded = state.expandedCategories[category];
   row.innerHTML = `
     <td colspan="10">
-      <button class="category-toggle" type="button" aria-expanded="${expanded}">
-        <span class="chevron">${expanded ? "v" : ">"}</span>
-        <strong>${categoryNumber(category)}</strong>
-        <span>${count} 項細項</span>
-        <b>${money(total)}</b>
-      </button>
-      <input class="category-name-input" type="text" value="${escapeHtml(category)}" />
-      <button class="ghost-button move-category-up" type="button">上移</button>
-      <button class="ghost-button move-category-down" type="button">下移</button>
-      <button class="soft-button add-category-item" type="button">新增細項</button>
-      <button class="text-action-button delete-category" type="button">刪除大項</button>
+      <div class="category-layout" draggable="true">
+        <span class="drag-handle" title="拖曳調整大項排序">拖曳</span>
+        <button class="category-toggle" type="button" aria-expanded="${expanded}" title="展開或收合">
+          <span class="chevron">${expanded ? "v" : ">"}</span>
+        </button>
+        <strong class="category-number">${categoryNumber(category)}</strong>
+        <input class="category-name-input" type="text" value="${escapeHtml(category)}" />
+        <span class="category-count">${count} 項細項</span>
+        <b class="category-total">${money(total)}</b>
+        <button class="soft-button add-category-item" type="button">新增細項</button>
+        <button class="text-action-button delete-category" type="button">刪除大項</button>
+      </div>
     </td>
   `;
   return row;
@@ -775,10 +776,13 @@ function renameCategory(oldName, newName) {
   renderItems();
 }
 
-function moveCategory(category, direction) {
-  const index = categories.indexOf(category);
-  const targetIndex = index + direction;
-  if (index < 0 || targetIndex < 0 || targetIndex >= categories.length) {
+function reorderCategory(sourceCategory, targetCategory) {
+  if (!sourceCategory || !targetCategory || sourceCategory === targetCategory) {
+    return;
+  }
+  const index = categories.indexOf(sourceCategory);
+  const targetIndex = categories.indexOf(targetCategory);
+  if (index < 0 || targetIndex < 0) {
     return;
   }
   const [moved] = categories.splice(index, 1);
@@ -1096,16 +1100,6 @@ function bindEvents() {
 
   els.itemsBody.addEventListener("click", (event) => {
     const categoryRow = event.target.closest(".category-row");
-    if (categoryRow && event.target.closest(".move-category-up")) {
-      moveCategory(categoryRow.dataset.category, -1);
-      return;
-    }
-
-    if (categoryRow && event.target.closest(".move-category-down")) {
-      moveCategory(categoryRow.dataset.category, 1);
-      return;
-    }
-
     if (categoryRow && event.target.closest(".delete-category")) {
       deleteCategory(categoryRow.dataset.category);
       return;
@@ -1145,6 +1139,51 @@ function bindEvents() {
     if (event.target.closest(".apply-ai-price")) {
       applyAiPrice(row);
     }
+  });
+
+  els.itemsBody.addEventListener("dragstart", (event) => {
+    const layout = event.target.closest(".category-layout");
+    const row = event.target.closest(".category-row");
+    if (!layout || !row) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", row.dataset.category);
+    row.classList.add("is-dragging");
+  });
+
+  els.itemsBody.addEventListener("dragover", (event) => {
+    const row = event.target.closest(".category-row");
+    if (!row) {
+      return;
+    }
+    event.preventDefault();
+    row.classList.add("is-drop-target");
+  });
+
+  els.itemsBody.addEventListener("dragleave", (event) => {
+    const row = event.target.closest(".category-row");
+    if (row) {
+      row.classList.remove("is-drop-target");
+    }
+  });
+
+  els.itemsBody.addEventListener("drop", (event) => {
+    const targetRow = event.target.closest(".category-row");
+    if (!targetRow) {
+      return;
+    }
+    event.preventDefault();
+    const sourceCategory = event.dataTransfer.getData("text/plain");
+    const targetCategory = targetRow.dataset.category;
+    reorderCategory(sourceCategory, targetCategory);
+  });
+
+  els.itemsBody.addEventListener("dragend", () => {
+    document.querySelectorAll(".category-row").forEach((row) => {
+      row.classList.remove("is-dragging", "is-drop-target");
+    });
   });
 
   els.itemsBody.addEventListener("change", (event) => {
