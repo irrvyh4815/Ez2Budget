@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Ez2Budget 是用於營造業、建築與土木工程的預算書編列工具，支援多預算書管理、大項細項編列、批次操作與 AI 詢價提示。"
+    />
+    <meta name="theme-color" content="#0d6b63" />
+    <title>Ez2Budget 工程預算編列</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-view="library">
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-mark">E2B</div>
+          <div>
+            <h1>Ez2Budget</h1>
+            <p>營造業與建築土木工程預算編列</p>
+          </div>
+        </div>
+        <div class="topbar-actions editor-only">
+          <button class="ghost-button" id="backToLibraryButton" type="button">返回列表</button>
+          <button class="primary-button" id="saveBudgetBookButton" type="button">儲存預算書</button>
+          <button class="ghost-button" id="importJsonButton" type="button">匯入</button>
+          <button class="ghost-button" id="exportJsonButton" type="button">JSON</button>
+          <button class="ghost-button" id="exportCsvButton" type="button">CSV</button>
+          <button class="primary-button" id="printButton" type="button">列印</button>
+          <input id="jsonFileInput" type="file" accept="application/json" hidden />
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="budget-library-view page-view is-active" id="budgetLibraryView" aria-label="預算書列表">
+          <div class="library-hero">
+            <div>
+              <span class="modal-kicker">預算書庫</span>
+              <h2>選擇要編輯的工地預算</h2>
+              <p>先建立或選取一份預算書，再進入編輯畫面管理大項、細項與 AI 詢價。</p>
+            </div>
+            <div class="create-budget-panel">
+              <label>
+                <span>新預算書名稱</span>
+                <input id="newBudgetBookName" type="text" placeholder="例如：A客戶-台中北屯案" />
+              </label>
+              <label>
+                <span>初始範本</span>
+                <select id="newBudgetTemplate">
+                  <option value="building">建築工程範本</option>
+                  <option value="civil">土木道路範本</option>
+                  <option value="empty">空白預算書</option>
+                </select>
+              </label>
+              <button class="primary-button" id="createBudgetBookButton" type="button">建立預算書</button>
+            </div>
+          </div>
+
+          <div class="saved-books library-books">
+            <button class="saved-books-toggle" id="toggleBudgetBooksButton" type="button" aria-expanded="true">
+              <span>已儲存預算書</span>
+              <strong id="savedBudgetCount">0</strong>
+            </button>
+            <div class="saved-books-list" id="budgetBooksList"></div>
+          </div>
+        </section>
+
+        <div class="budget-editor-view page-view" id="budgetEditorView" hidden>
+          <section class="budget-books-panel editor-title-panel" aria-label="預算書名稱">
+            <label>
+              <span>預算書名稱</span>
+              <input id="budgetBookName" type="text" placeholder="例如：A客戶-台中北屯案第一次估算" />
+            </label>
+          </section>
+
+        <section class="project-panel" aria-label="工程資訊">
+          <div class="field-grid">
+            <label>
+              <span>工程名稱</span>
+              <input id="projectName" type="text" />
+            </label>
+            <label>
+              <span>業主</span>
+              <input id="clientName" type="text" />
+            </label>
+            <label>
+              <span>地點</span>
+              <input id="projectLocation" type="text" />
+            </label>
+            <label>
+              <span>編列日期</span>
+              <input id="estimateDate" type="date" />
+            </label>
+          </div>
+          <div class="rate-grid">
+            <label>
+              <span>間接費率 %</span>
+              <input id="overheadRate" type="number" min="0" step="0.1" />
+            </label>
+            <label>
+              <span>利潤率 %</span>
+              <input id="profitRate" type="number" min="0" step="0.1" />
+            </label>
+            <label>
+              <span>準備金 %</span>
+              <input id="contingencyRate" type="number" min="0" step="0.1" />
+            </label>
+            <label>
+              <span>營業稅 %</span>
+              <input id="taxRate" type="number" min="0" step="0.1" />
+            </label>
+          </div>
+        </section>
+
+        <section class="summary-strip" aria-label="預算總表">
+          <div class="summary-cell">
+            <span>直接工程費</span>
+            <strong id="directCost">$0</strong>
+          </div>
+          <div class="summary-cell">
+            <span>間接費與利潤</span>
+            <strong id="feeCost">$0</strong>
+          </div>
+          <div class="summary-cell">
+            <span>準備金</span>
+            <strong id="contingencyCost">$0</strong>
+          </div>
+          <div class="summary-cell">
+            <span>營業稅</span>
+            <strong id="taxCost">$0</strong>
+          </div>
+          <div class="summary-cell total">
+            <span>預算總價</span>
+            <strong id="grandTotal">$0</strong>
+          </div>
+        </section>
+
+        <section class="tool-panel" aria-label="預算工具">
+          <div class="toolbar-row">
+            <div class="template-group">
+              <button class="soft-button" data-template="building" type="button">建築工程範本</button>
+              <button class="soft-button" data-template="civil" type="button">土木道路範本</button>
+              <button class="soft-button" data-template="empty" type="button">清空明細</button>
+            </div>
+            <div class="category-actions">
+              <input id="newCategoryName" type="text" placeholder="新增大項名稱" />
+              <button class="soft-button" id="addCategoryButton" type="button">新增大項</button>
+            </div>
+            <div class="table-actions">
+              <input id="searchInput" type="search" placeholder="搜尋細項、編碼、用料、類別" />
+              <select id="categoryFilter" aria-label="類別篩選">
+                <option value="all">全部類別</option>
+              </select>
+              <button class="primary-button" id="addItemButton" type="button">新增項目</button>
+            </div>
+          </div>
+
+          <div class="bulk-actions-bar">
+            <span id="selectedCount">已選取 0 項</span>
+            <button class="soft-button" id="bulkAiButton" type="button">批次 AI 詢價</button>
+            <button class="ghost-button" id="bulkDuplicateButton" type="button">批次複製</button>
+            <button class="ghost-button danger-button" id="bulkDeleteButton" type="button">批次刪除</button>
+          </div>
+
+          <div class="budget-table-wrap">
+            <table class="budget-table">
+              <thead>
+                <tr>
+                  <th class="col-select">
+                    <label class="select-all-label">
+                      <input id="selectAllItems" type="checkbox" aria-label="選取全部細項" />
+                      <span>全選</span>
+                    </label>
+                  </th>
+                  <th class="col-code">編碼</th>
+                  <th>細項名稱</th>
+                  <th>用料 / 規格</th>
+                  <th class="col-unit">單位</th>
+                  <th class="col-number">預估數量</th>
+                  <th class="col-number">單價</th>
+                  <th class="col-ai">AI 詢價</th>
+                  <th class="col-number">複價</th>
+                  <th class="col-action">操作</th>
+                </tr>
+              </thead>
+              <tbody id="itemsBody"></tbody>
+            </table>
+            <div class="empty-state" id="emptyState">目前沒有符合條件的工項</div>
+          </div>
+        </section>
+        </div>
+      </main>
+    </div>
+
+    <template id="itemRowTemplate">
+      <tr class="detail-row">
+        <td><input class="item-select" type="checkbox" aria-label="選取細項" /></td>
+        <td><input class="item-code" type="text" /></td>
+        <td><input class="item-name" type="text" /></td>
+        <td><input class="item-material" type="text" /></td>
+        <td><input class="item-unit" type="text" /></td>
+        <td><input class="item-quantity" type="number" min="0" step="0.001" /></td>
+        <td><input class="item-price" type="number" min="0" step="1" /></td>
+        <td>
+          <div class="ai-inline">
+            <button class="soft-button ai-price-row" type="button">AI 詢價</button>
+            <input class="item-suggested-price" type="number" min="0" step="1" placeholder="按 AI 後顯示" hidden />
+            <button class="ghost-button apply-ai-price" type="button" hidden>套用</button>
+          </div>
+        </td>
+        <td class="line-total">$0</td>
+        <td class="row-actions">
+          <button class="text-action-button duplicate-row" type="button">複製</button>
+          <button class="text-action-button delete-row" type="button">刪除</button>
+        </td>
+      </tr>
+    </template>
+
+    <section class="ai-drawer" id="aiDrawer" aria-live="polite" hidden>
+      <div>
+        <span class="modal-kicker">AI 市價參考</span>
+        <h2 id="aiDrawerTitle">細項詢價</h2>
+      </div>
+      <button class="icon-button" id="closeAiDrawer" type="button" title="關閉">x</button>
+      <textarea id="aiPromptOutput" readonly></textarea>
+      <p id="aiResultText">按下細項的 AI 詢價後，這裡會顯示查價提示、來源要求與回填狀態。</p>
+      <div class="ai-drawer-actions">
+        <button class="ghost-button" id="copyAiPromptButton" type="button">複製提示</button>
+        <a class="primary-link" id="openAiSearchLink" href="#" target="_blank" rel="noreferrer">開啟搜尋</a>
+      </div>
+    </section>
+
+    <script src="app.js"></script>
+  </body>
+</html>
