@@ -381,7 +381,7 @@ h1 {
 
 .project-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
+  grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.9fr);
   gap: 14px;
   padding: 16px;
 }
@@ -393,7 +393,7 @@ h1 {
 }
 
 .field-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
 }
 
 .rate-grid {

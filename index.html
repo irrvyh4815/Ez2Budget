@@ -76,6 +76,10 @@
               <input id="projectName" type="text" required />
             </label>
             <label>
+              <span>工程類型</span>
+              <input id="projectType" type="text" placeholder="例如：住宅新建、道路改善、室內裝修" />
+            </label>
+            <label>
               <span>業主</span>
               <input id="clientName" type="text" />
             </label>
@@ -287,7 +291,7 @@
           </div>
           <button class="icon-button" id="closeBudgetAdvisorButton" type="button" title="關閉">x</button>
         </div>
-        <p>使用 AI 檢核目前預算明細，提示可能缺少的常見細項。</p>
+        <p>使用 AI 自動檢核目前預算書，提示可能缺少的常見細項。</p>
         <button class="primary-button" id="runBudgetAdviceButton" type="button">產生建議</button>
         <div class="advisor-results" id="budgetAdviceResults">尚未產生建議。</div>
       </section>

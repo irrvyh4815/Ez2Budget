@@ -55,6 +55,7 @@ const defaultState = {
   project: {
     budgetName: "新建工程預算書",
     name: "新建工程預算書",
+    type: "",
     client: "",
     location: "",
     date: new Date().toISOString().slice(0, 10),
@@ -83,6 +84,7 @@ const els = {
   savedBudgetCount: document.querySelector("#savedBudgetCount"),
   budgetBooksList: document.querySelector("#budgetBooksList"),
   projectName: document.querySelector("#projectName"),
+  projectType: document.querySelector("#projectType"),
   clientName: document.querySelector("#clientName"),
   projectLocation: document.querySelector("#projectLocation"),
   estimateDate: document.querySelector("#estimateDate"),
@@ -145,7 +147,6 @@ let budgetBooks = loadBudgetBooks();
 categories = [...state.categories];
 let activeAiIndex = null;
 const selectedItemIds = new Set();
-let saveStatusTimer = null;
 let pendingSmartPriceAction = null;
 let lastSavedBudgetSignature = "";
 const SMART_PRICE_REMINDER_KEY = "ez2budget-smart-price-reminder-dismissed";
@@ -340,6 +341,7 @@ function showEditor() {
   els.budgetLibraryView.hidden = true;
   els.budgetEditorView.hidden = false;
   els.budgetAdvisor.hidden = false;
+  showSaveStatus();
   requestAnimationFrame(() => {
     els.budgetEditorView.classList.add("is-active");
     els.budgetLibraryView.classList.remove("is-active");
@@ -446,6 +448,7 @@ function categoryTotal(category) {
 function hydrateControls() {
   els.budgetBookName.value = state.project.budgetName || state.project.name;
   els.projectName.value = state.project.name;
+  els.projectType.value = state.project.type || "";
   els.clientName.value = state.project.client;
   els.projectLocation.value = state.project.location;
   els.estimateDate.value = state.project.date;
@@ -686,6 +689,7 @@ function updateProject() {
   state.project = {
     budgetName: els.budgetBookName.value,
     name: els.projectName.value,
+    type: els.projectType.value,
     client: els.clientName.value,
     location: els.projectLocation.value,
     date: els.estimateDate.value,
@@ -737,7 +741,6 @@ function upsertCurrentBudgetBook(name) {
 
 function saveBudgetBook() {
   if (!validateRequiredProjectName()) {
-    clearSaveStatus();
     return;
   }
   updateProject();
@@ -752,20 +755,22 @@ function saveBudgetBook() {
 }
 
 function showSaveStatus() {
+  const activeBook = budgetBooks.find((book) => book.id === state.activeBudgetId);
+  const savedAt = activeBook?.updatedAt;
+  if (!savedAt) {
+    els.saveStatus.textContent = "尚未儲存";
+    els.saveStatus.classList.add("is-visible");
+    return;
+  }
   const time = new Intl.DateTimeFormat("zh-TW", {
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date());
-  els.saveStatus.textContent = `已儲存 ${time}`;
+  }).format(new Date(savedAt));
+  els.saveStatus.textContent = `上次儲存 ${time}`;
   els.saveStatus.classList.add("is-visible");
-  window.clearTimeout(saveStatusTimer);
-  saveStatusTimer = window.setTimeout(() => {
-    els.saveStatus.classList.remove("is-visible");
-  }, 2800);
 }
 
 function clearSaveStatus() {
-  window.clearTimeout(saveStatusTimer);
   els.saveStatus.textContent = "";
   els.saveStatus.classList.remove("is-visible");
 }
@@ -788,6 +793,7 @@ function loadBudgetBook(id) {
   renderBudgetBooks();
   renderItems();
   markBudgetSaved();
+  showSaveStatus();
   showEditor();
 }
 
@@ -1121,9 +1127,6 @@ function toggleBudgetAdvisor() {
   const nextHidden = !els.budgetAdvisorPanel.hidden;
   els.budgetAdvisorPanel.hidden = nextHidden;
   els.budgetAdvisorToggle.setAttribute("aria-expanded", String(!nextHidden));
-  if (!nextHidden) {
-    renderBudgetAdvice();
-  }
 }
 
 function closeBudgetAdvisor() {
@@ -1132,13 +1135,15 @@ function closeBudgetAdvisor() {
 }
 
 function budgetAdviceChecks() {
-  const projectText = `${state.project.name} ${state.project.location} ${state.project.client}`.toLowerCase();
+  const projectType = String(state.project.type || "").trim();
+  const projectText = `${state.project.name} ${projectType} ${state.project.location} ${state.project.client}`.toLowerCase();
   const itemText = state.items.map((item) => `${item.category} ${item.name} ${item.material}`).join(" ").toLowerCase();
   const hasAny = (keywords) => keywords.some((keyword) => itemText.includes(keyword.toLowerCase()));
+  const isType = (keywords) => keywords.some((keyword) => projectText.includes(keyword.toLowerCase()));
   const advice = [];
 
   if (state.items.length === 0) {
-    advice.push("目前尚未建立任何明細，建議先加入假設工程、主要結構/工法、機電或排水等核心項目。");
+    advice.push(`目前尚未建立任何明細，建議先依${projectType || "工程類型"}建立主要工項架構。`);
   }
 
   [
@@ -1153,12 +1158,24 @@ function budgetAdviceChecks() {
     }
   });
 
-  if ((projectText.includes("建") || projectText.includes("宅") || itemText.includes("混凝土")) && !hasAny(["模板", "鋼筋", "混凝土"])) {
+  if (isType(["建築", "住宅", "新建", "廠房", "結構"]) && !hasAny(["模板", "鋼筋", "混凝土"])) {
     advice.push("建築或結構工程常需要確認模板、鋼筋、混凝土是否已分項列入。");
   }
 
-  if ((projectText.includes("道路") || itemText.includes("瀝青") || itemText.includes("級配")) && !hasAny(["標線", "排水", "交通維持"])) {
+  if (isType(["室內", "裝修", "裝潢"]) && !hasAny(["拆除", "泥作", "天花", "油漆", "地坪", "水電"])) {
+    advice.push("室內裝修工程常需要確認拆除、泥作、天花、牆面、地坪、水電與清潔保護是否完整。");
+  }
+
+  if (isType(["道路", "土木", "鋪面", "人行道"]) && !hasAny(["標線", "排水", "交通維持"])) {
     advice.push("道路工程常需要確認交通維持、排水設施、標線或路面收邊是否已列入。");
+  }
+
+  if (isType(["排水", "水利", "管線", "下水道"]) && !hasAny(["開挖", "回填", "管材", "人孔", "集水井", "抽排水"])) {
+    advice.push("排水或管線工程常需要確認開挖回填、管材、人孔/集水井、抽排水與既有管線保護。");
+  }
+
+  if (isType(["機電", "水電", "空調", "消防"]) && !hasAny(["配管", "配線", "盤", "設備", "測試", "消防"])) {
+    advice.push("機電工程常需要確認配管配線、設備安裝、盤體、測試試運轉與消防介面項目。");
   }
 
   if (!hasAny(["稅", "準備金", "間接費", "利潤"])) {
@@ -1540,12 +1557,14 @@ function buildFormalReportHtml(options = {}) {
           <tr>
             <th>工程名稱</th>
             <td>${escapeHtml(state.project.name || "")}</td>
-            <th>業主</th>
-            <td>${escapeHtml(state.project.client || "")}</td>
+            <th>工程類型</th>
+            <td>${escapeHtml(state.project.type || "")}</td>
           </tr>
           <tr>
+            <th>業主</th>
+            <td>${escapeHtml(state.project.client || "")}</td>
             <th>工程地點</th>
-            <td colspan="3">${escapeHtml(state.project.location || "")}</td>
+            <td>${escapeHtml(state.project.location || "")}</td>
           </tr>
         </tbody>
       </table>
@@ -1638,7 +1657,7 @@ function importJson(file) {
 }
 
 function bindEvents() {
-  [els.budgetBookName, els.projectName, els.clientName, els.projectLocation, els.estimateDate].forEach((input) => {
+  [els.budgetBookName, els.projectName, els.projectType, els.clientName, els.projectLocation, els.estimateDate].forEach((input) => {
     input.addEventListener("input", updateProject);
   });
   [els.newBudgetBookName, els.projectName].forEach((input) => {
