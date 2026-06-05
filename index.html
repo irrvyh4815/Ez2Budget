@@ -45,8 +45,8 @@
             </div>
             <div class="create-budget-panel">
               <label>
-                <span>新預算書名稱</span>
-                <input id="newBudgetBookName" type="text" placeholder="例如：A客戶-台中北屯案" />
+                <span>工程名稱</span>
+                <input id="newBudgetBookName" type="text" placeholder="例如：A客戶-台中北屯案" required />
               </label>
               <button class="primary-button" id="createBudgetBookButton" type="button">建立預算書</button>
             </div>
@@ -73,7 +73,7 @@
           <div class="field-grid">
             <label>
               <span>工程名稱</span>
-              <input id="projectName" type="text" />
+              <input id="projectName" type="text" required />
             </label>
             <label>
               <span>業主</span>
@@ -244,6 +244,54 @@
         </div>
       </div>
     </section>
+
+    <section class="confirm-modal" id="unsavedReturnModal" aria-modal="true" role="dialog" aria-labelledby="unsavedReturnTitle" hidden>
+      <div class="confirm-dialog">
+        <h2 id="unsavedReturnTitle">您的專案尚未儲存，要直接返回列表嗎？</h2>
+        <div class="modal-actions split-actions">
+          <button class="ghost-button danger-button" id="discardReturnButton" type="button">不存檔返回</button>
+          <button class="primary-button" id="continueEditingButton" type="button">繼續編輯</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="confirm-modal" id="clearItemsModal" aria-modal="true" role="dialog" aria-labelledby="clearItemsTitle" hidden>
+      <div class="confirm-dialog">
+        <h2 id="clearItemsTitle">確定要清空所有明細嗎？</h2>
+        <p>清空後目前預算書的所有細項都會移除，此動作無法復原。</p>
+        <div class="modal-actions split-actions">
+          <button class="ghost-button" id="cancelClearItemsButton" type="button">取消</button>
+          <button class="ghost-button danger-button" id="confirmClearItemsButton" type="button">清空明細</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="create-transition" id="createTransition" aria-live="polite" hidden>
+      <div class="create-transition-panel">
+        <div class="transition-mark">E2B</div>
+        <h2>正在建立工程預算書</h2>
+        <p>正在整理工程資訊與預算明細工作區</p>
+      </div>
+    </section>
+
+    <aside class="budget-advisor" id="budgetAdvisor" hidden>
+      <button class="advisor-toggle" id="budgetAdvisorToggle" type="button" aria-expanded="false">
+        <span class="advisor-robot" aria-hidden="true">🤖</span>
+        <span>預算建議</span>
+      </button>
+      <section class="advisor-panel" id="budgetAdvisorPanel" aria-label="預算建議" hidden>
+        <div class="advisor-header">
+          <div>
+            <span class="modal-kicker">預算建議</span>
+            <h2>細項檢核</h2>
+          </div>
+          <button class="icon-button" id="closeBudgetAdvisorButton" type="button" title="關閉">x</button>
+        </div>
+        <p>使用 AI 檢核目前預算明細，提示可能缺少的常見細項。</p>
+        <button class="primary-button" id="runBudgetAdviceButton" type="button">產生建議</button>
+        <div class="advisor-results" id="budgetAdviceResults">尚未產生建議。</div>
+      </section>
+    </aside>
 
     <script src="app.js"></script>
   </body>

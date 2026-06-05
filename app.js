@@ -125,6 +125,19 @@ const els = {
   smartPriceModal: document.querySelector("#smartPriceModal"),
   skipSmartPriceReminder: document.querySelector("#skipSmartPriceReminder"),
   confirmSmartPriceButton: document.querySelector("#confirmSmartPriceButton"),
+  unsavedReturnModal: document.querySelector("#unsavedReturnModal"),
+  discardReturnButton: document.querySelector("#discardReturnButton"),
+  continueEditingButton: document.querySelector("#continueEditingButton"),
+  clearItemsModal: document.querySelector("#clearItemsModal"),
+  confirmClearItemsButton: document.querySelector("#confirmClearItemsButton"),
+  cancelClearItemsButton: document.querySelector("#cancelClearItemsButton"),
+  createTransition: document.querySelector("#createTransition"),
+  budgetAdvisor: document.querySelector("#budgetAdvisor"),
+  budgetAdvisorToggle: document.querySelector("#budgetAdvisorToggle"),
+  budgetAdvisorPanel: document.querySelector("#budgetAdvisorPanel"),
+  closeBudgetAdvisorButton: document.querySelector("#closeBudgetAdvisorButton"),
+  runBudgetAdviceButton: document.querySelector("#runBudgetAdviceButton"),
+  budgetAdviceResults: document.querySelector("#budgetAdviceResults"),
 };
 
 let state = loadState();
@@ -134,6 +147,7 @@ let activeAiIndex = null;
 const selectedItemIds = new Set();
 let saveStatusTimer = null;
 let pendingSmartPriceAction = null;
+let lastSavedBudgetSignature = "";
 const SMART_PRICE_REMINDER_KEY = "ez2budget-smart-price-reminder-dismissed";
 
 function loadState() {
@@ -258,11 +272,62 @@ function saveState() {
   localStorage.setItem(STORAGE_KEYS.current, JSON.stringify(state));
 }
 
+function currentBudgetSignature() {
+  return JSON.stringify(snapshotCurrentBudget());
+}
+
+function markBudgetSaved() {
+  lastSavedBudgetSignature = currentBudgetSignature();
+}
+
+function hasUnsavedBudgetChanges() {
+  return document.body.dataset.view === "editor" && currentBudgetSignature() !== lastSavedBudgetSignature;
+}
+
+function validateRequiredProjectName(input = els.projectName) {
+  const value = input.value.trim();
+  if (value) {
+    input.setCustomValidity("");
+    input.classList.remove("is-invalid");
+    return value;
+  }
+  input.setCustomValidity("請先輸入工程名稱");
+  input.classList.add("is-invalid");
+  input.reportValidity();
+  input.focus();
+  return "";
+}
+
+function openUnsavedReturnModal() {
+  els.unsavedReturnModal.hidden = false;
+  els.continueEditingButton.focus();
+}
+
+function closeUnsavedReturnModal() {
+  els.unsavedReturnModal.hidden = true;
+}
+
+function requestShowLibrary() {
+  if (hasUnsavedBudgetChanges()) {
+    openUnsavedReturnModal();
+    return;
+  }
+  showLibrary();
+}
+
+function discardAndShowLibrary() {
+  closeUnsavedReturnModal();
+  markBudgetSaved();
+  showLibrary();
+}
+
 function showLibrary() {
   closeAiDrawer();
+  closeBudgetAdvisor();
   selectedItemIds.clear();
   els.budgetEditorView.hidden = true;
   els.budgetLibraryView.hidden = false;
+  els.budgetAdvisor.hidden = true;
   requestAnimationFrame(() => {
     els.budgetLibraryView.classList.add("is-active");
     els.budgetEditorView.classList.remove("is-active");
@@ -274,11 +339,20 @@ function showLibrary() {
 function showEditor() {
   els.budgetLibraryView.hidden = true;
   els.budgetEditorView.hidden = false;
+  els.budgetAdvisor.hidden = false;
   requestAnimationFrame(() => {
     els.budgetEditorView.classList.add("is-active");
     els.budgetLibraryView.classList.remove("is-active");
   });
   document.body.dataset.view = "editor";
+}
+
+function showCreateTransition() {
+  els.createTransition.hidden = false;
+}
+
+function hideCreateTransition() {
+  els.createTransition.hidden = true;
 }
 
 function money(value) {
@@ -657,13 +731,22 @@ function upsertCurrentBudgetBook(name) {
   saveBudgetBooks();
   saveState();
   renderBudgetBooks();
+  markBudgetSaved();
   return book;
 }
 
 function saveBudgetBook() {
+  if (!validateRequiredProjectName()) {
+    clearSaveStatus();
+    return;
+  }
   updateProject();
   updateRates();
-  upsertCurrentBudgetBook(els.budgetBookName.value.trim() || state.project.name.trim() || "未命名預算書");
+  if (!els.budgetBookName.value.trim()) {
+    els.budgetBookName.value = els.projectName.value.trim();
+    updateProject();
+  }
+  upsertCurrentBudgetBook(els.budgetBookName.value.trim() || state.project.name.trim());
   hydrateControls();
   showSaveStatus();
 }
@@ -679,6 +762,12 @@ function showSaveStatus() {
   saveStatusTimer = window.setTimeout(() => {
     els.saveStatus.classList.remove("is-visible");
   }, 2800);
+}
+
+function clearSaveStatus() {
+  window.clearTimeout(saveStatusTimer);
+  els.saveStatus.textContent = "";
+  els.saveStatus.classList.remove("is-visible");
 }
 
 function loadBudgetBook(id) {
@@ -698,6 +787,7 @@ function loadBudgetBook(id) {
   hydrateControls();
   renderBudgetBooks();
   renderItems();
+  markBudgetSaved();
   showEditor();
 }
 
@@ -722,8 +812,8 @@ function createBudgetBookFromTemplate(templateName, name) {
     ...defaultState,
     project: {
       ...defaultState.project,
-      budgetName: name || "未命名預算書",
-      name: name || "新建工程預算書",
+      budgetName: name,
+      name,
       date: new Date().toISOString().slice(0, 10),
     },
     categories: nextCategories,
@@ -742,15 +832,22 @@ function createBudgetBookFromTemplate(templateName, name) {
   hydrateControls();
   renderBudgetBooks();
   renderItems();
-  upsertCurrentBudgetBook(name || "未命名預算書");
+  upsertCurrentBudgetBook(name);
   hydrateControls();
-  showEditor();
 }
 
 function createBudgetBookFromLibrary() {
-  const name = els.newBudgetBookName.value.trim() || "未命名預算書";
+  const name = validateRequiredProjectName(els.newBudgetBookName);
+  if (!name) {
+    return;
+  }
+  showCreateTransition();
   createBudgetBookFromTemplate("empty", name);
   els.newBudgetBookName.value = "";
+  window.setTimeout(() => {
+    hideCreateTransition();
+    showEditor();
+  }, 850);
 }
 
 function updateRates() {
@@ -845,10 +942,17 @@ function addCategory() {
   renderItems();
 }
 
+function requestClearItems() {
+  els.clearItemsModal.hidden = false;
+  els.cancelClearItemsButton.focus();
+}
+
+function closeClearItemsModal() {
+  els.clearItemsModal.hidden = true;
+}
+
 function clearItems() {
-  if (state.items.length > 0 && !window.confirm("確定清空所有明細？此動作無法復原。")) {
-    return;
-  }
+  closeClearItemsModal();
   state.items = [];
   state.activeBudgetId = "";
   selectedItemIds.clear();
@@ -1011,6 +1115,70 @@ function confirmSmartPriceReminder() {
 function closeSmartPriceReminder() {
   pendingSmartPriceAction = null;
   els.smartPriceModal.hidden = true;
+}
+
+function toggleBudgetAdvisor() {
+  const nextHidden = !els.budgetAdvisorPanel.hidden;
+  els.budgetAdvisorPanel.hidden = nextHidden;
+  els.budgetAdvisorToggle.setAttribute("aria-expanded", String(!nextHidden));
+  if (!nextHidden) {
+    renderBudgetAdvice();
+  }
+}
+
+function closeBudgetAdvisor() {
+  els.budgetAdvisorPanel.hidden = true;
+  els.budgetAdvisorToggle.setAttribute("aria-expanded", "false");
+}
+
+function budgetAdviceChecks() {
+  const projectText = `${state.project.name} ${state.project.location} ${state.project.client}`.toLowerCase();
+  const itemText = state.items.map((item) => `${item.category} ${item.name} ${item.material}`).join(" ").toLowerCase();
+  const hasAny = (keywords) => keywords.some((keyword) => itemText.includes(keyword.toLowerCase()));
+  const advice = [];
+
+  if (state.items.length === 0) {
+    advice.push("目前尚未建立任何明細，建議先加入假設工程、主要結構/工法、機電或排水等核心項目。");
+  }
+
+  [
+    { label: "施工安全與臨時設施", keywords: ["圍籬", "安全", "交通維持", "施工架", "臨時"] },
+    { label: "廢棄物清運與合法處理", keywords: ["清運", "棄土", "廢棄物", "運棄"] },
+    { label: "材料運搬與吊運", keywords: ["運搬", "吊運", "機具", "搬運"] },
+    { label: "品質檢驗與試驗", keywords: ["試驗", "檢驗", "測試", "品管"] },
+    { label: "竣工清潔與收尾", keywords: ["清潔", "收尾", "竣工", "整理"] },
+  ].forEach((check) => {
+    if (!hasAny(check.keywords)) {
+      advice.push(`可能缺少：${check.label}。`);
+    }
+  });
+
+  if ((projectText.includes("建") || projectText.includes("宅") || itemText.includes("混凝土")) && !hasAny(["模板", "鋼筋", "混凝土"])) {
+    advice.push("建築或結構工程常需要確認模板、鋼筋、混凝土是否已分項列入。");
+  }
+
+  if ((projectText.includes("道路") || itemText.includes("瀝青") || itemText.includes("級配")) && !hasAny(["標線", "排水", "交通維持"])) {
+    advice.push("道路工程常需要確認交通維持、排水設施、標線或路面收邊是否已列入。");
+  }
+
+  if (!hasAny(["稅", "準備金", "間接費", "利潤"])) {
+    advice.push("費率區已有間接費、利潤、準備金與營業稅，送審前仍建議核對是否符合合約或業主格式。");
+  }
+
+  return advice.slice(0, 8);
+}
+
+function renderBudgetAdvice() {
+  const advice = budgetAdviceChecks();
+  if (advice.length === 0) {
+    els.budgetAdviceResults.innerHTML = "<p>目前沒有明顯缺漏，建議仍依圖說、規範與契約條件逐項核對。</p>";
+    return;
+  }
+  els.budgetAdviceResults.innerHTML = `
+    <ul>
+      ${advice.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+    </ul>
+  `;
 }
 
 function runBulkAiPriceSearch() {
@@ -1473,6 +1641,14 @@ function bindEvents() {
   [els.budgetBookName, els.projectName, els.clientName, els.projectLocation, els.estimateDate].forEach((input) => {
     input.addEventListener("input", updateProject);
   });
+  [els.newBudgetBookName, els.projectName].forEach((input) => {
+    input.addEventListener("input", () => {
+      if (input.value.trim()) {
+        input.setCustomValidity("");
+        input.classList.remove("is-invalid");
+      }
+    });
+  });
 
   [els.overheadRate, els.profitRate, els.contingencyRate, els.taxRate].forEach((input) => {
     input.addEventListener("input", updateRates);
@@ -1610,7 +1786,7 @@ function bindEvents() {
   });
 
   els.addItemButton.addEventListener("click", () => addItem());
-  els.backToLibraryButton.addEventListener("click", showLibrary);
+  els.backToLibraryButton.addEventListener("click", requestShowLibrary);
   els.createBudgetBookButton.addEventListener("click", createBudgetBookFromLibrary);
   els.newBudgetBookName.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
@@ -1636,7 +1812,7 @@ function bindEvents() {
   els.bulkAiButton.addEventListener("click", runBulkAiPriceSearch);
   els.bulkDuplicateButton.addEventListener("click", duplicateSelectedItems);
   els.bulkDeleteButton.addEventListener("click", deleteSelectedItems);
-  els.clearItemsButton.addEventListener("click", clearItems);
+  els.clearItemsButton.addEventListener("click", requestClearItems);
   els.saveBudgetBookButton.addEventListener("click", saveBudgetBook);
   els.toggleBudgetBooksButton.addEventListener("click", () => {
     state.budgetBooksExpanded = !state.budgetBooksExpanded;
@@ -1673,6 +1849,23 @@ function bindEvents() {
       closeSmartPriceReminder();
     }
   });
+  els.discardReturnButton.addEventListener("click", discardAndShowLibrary);
+  els.continueEditingButton.addEventListener("click", closeUnsavedReturnModal);
+  els.unsavedReturnModal.addEventListener("click", (event) => {
+    if (event.target === els.unsavedReturnModal) {
+      closeUnsavedReturnModal();
+    }
+  });
+  els.confirmClearItemsButton.addEventListener("click", clearItems);
+  els.cancelClearItemsButton.addEventListener("click", closeClearItemsModal);
+  els.clearItemsModal.addEventListener("click", (event) => {
+    if (event.target === els.clearItemsModal) {
+      closeClearItemsModal();
+    }
+  });
+  els.budgetAdvisorToggle.addEventListener("click", toggleBudgetAdvisor);
+  els.closeBudgetAdvisorButton.addEventListener("click", closeBudgetAdvisor);
+  els.runBudgetAdviceButton.addEventListener("click", renderBudgetAdvice);
   document.addEventListener("click", (event) => {
     if (!event.target.closest(".export-menu")) {
       closeExportMenu();
@@ -1683,6 +1876,9 @@ function bindEvents() {
       closeExportMenu();
       closeActionMenus();
       closeSmartPriceReminder();
+      closeUnsavedReturnModal();
+      closeClearItemsModal();
+      closeBudgetAdvisor();
     }
   });
 }
@@ -1693,4 +1889,5 @@ bindEvents();
 saveState();
 renderBudgetBooks();
 renderItems();
+markBudgetSaved();
 showLibrary();
