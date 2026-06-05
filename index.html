@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Ez2Budget 是用於營造業、建築與土木工程的預算書編列工具，支援多預算書管理、大項細項編列、批次操作與 AI 詢價提示。"
+      content="Ez2Budget 是用於營造業、建築與土木工程的預算書編列工具，支援多預算書管理、大項細項編列、批次操作與智慧詢價提示。"
     />
     <meta name="theme-color" content="#1f4e79" />
     <title>Ez2Budget 工程預算編列</title>
@@ -41,20 +41,12 @@
             <div>
               <span class="modal-kicker">預算書庫</span>
               <h2>選擇要編輯的工地預算</h2>
-              <p>先建立或選取一份預算書，再進入編輯畫面管理大項、細項與 AI 詢價。</p>
+              <p>先建立或選取一份預算書，再進入編輯畫面管理大項、細項與智慧詢價。</p>
             </div>
             <div class="create-budget-panel">
               <label>
                 <span>新預算書名稱</span>
                 <input id="newBudgetBookName" type="text" placeholder="例如：A客戶-台中北屯案" />
-              </label>
-              <label>
-                <span>初始範本</span>
-                <select id="newBudgetTemplate">
-                  <option value="building">建築工程範本</option>
-                  <option value="civil">土木道路範本</option>
-                  <option value="empty">空白預算書</option>
-                </select>
               </label>
               <button class="primary-button" id="createBudgetBookButton" type="button">建立預算書</button>
             </div>
@@ -141,11 +133,6 @@
 
         <section class="tool-panel" aria-label="預算工具">
           <div class="toolbar-row">
-            <div class="template-group">
-              <button class="soft-button" data-template="building" type="button">建築工程範本</button>
-              <button class="soft-button" data-template="civil" type="button">土木道路範本</button>
-              <button class="soft-button" data-template="empty" type="button">清空明細</button>
-            </div>
             <div class="category-actions">
               <input id="newCategoryName" type="text" placeholder="新增大項名稱" />
               <button class="soft-button" id="addCategoryButton" type="button">新增大項</button>
@@ -161,7 +148,8 @@
 
           <div class="bulk-actions-bar">
             <span id="selectedCount">已選取 0 項</span>
-            <button class="soft-button" id="bulkAiButton" type="button">批次 AI 詢價</button>
+            <button class="ghost-button danger-button" id="clearItemsButton" type="button">清空明細</button>
+            <button class="soft-button" id="bulkAiButton" type="button">批次智慧詢價</button>
             <button class="ghost-button" id="bulkDuplicateButton" type="button">批次複製</button>
             <button class="ghost-button danger-button" id="bulkDeleteButton" type="button">批次刪除</button>
           </div>
@@ -182,7 +170,7 @@
                   <th class="col-unit">單位</th>
                   <th class="col-number">預估數量</th>
                   <th class="col-number">單價</th>
-                  <th class="col-ai">AI 詢價</th>
+                  <th class="col-ai">智慧詢價</th>
                   <th class="col-number">複價</th>
                   <th class="col-action">操作</th>
                 </tr>
@@ -210,8 +198,8 @@
         <td><input class="item-price" type="number" min="0" step="1" /></td>
         <td>
           <div class="ai-inline">
-            <button class="soft-button ai-price-row" type="button">AI 詢價</button>
-            <input class="item-suggested-price" type="number" min="0" step="1" placeholder="按 AI 後顯示" hidden />
+            <button class="soft-button ai-price-row" type="button">智慧詢價</button>
+            <input class="item-suggested-price" type="number" min="0" step="1" placeholder="詢價後顯示" hidden />
             <button class="ghost-button apply-ai-price" type="button" hidden>套用</button>
           </div>
         </td>
@@ -230,15 +218,30 @@
 
     <section class="ai-drawer" id="aiDrawer" aria-live="polite" hidden>
       <div>
-        <span class="modal-kicker">AI 市價參考</span>
+        <span class="modal-kicker">智慧市價參考</span>
         <h2 id="aiDrawerTitle">細項詢價</h2>
       </div>
       <button class="icon-button" id="closeAiDrawer" type="button" title="關閉">x</button>
       <textarea id="aiPromptOutput" readonly></textarea>
-      <p id="aiResultText">按下細項的 AI 詢價後，這裡會顯示查價提示、來源要求與回填狀態。</p>
+      <p id="aiResultText">按下細項的智慧詢價後，這裡會顯示查價提示、來源要求與回填狀態。</p>
       <div class="ai-drawer-actions">
         <button class="ghost-button" id="copyAiPromptButton" type="button">複製提示</button>
         <a class="primary-link" id="openAiSearchLink" href="#" target="_blank" rel="noreferrer">開啟搜尋</a>
+      </div>
+    </section>
+
+    <section class="smart-price-modal" id="smartPriceModal" aria-modal="true" role="dialog" aria-labelledby="smartPriceModalTitle" hidden>
+      <div class="smart-price-dialog">
+        <span class="modal-kicker">智慧詢價提醒</span>
+        <h2 id="smartPriceModalTitle">使用前請確認</h2>
+        <p>使用此智慧詢價功能為採用Ai彙整目前市場價格，僅提供預估參考。</p>
+        <label class="modal-check">
+          <input id="skipSmartPriceReminder" type="checkbox" />
+          <span>不再提醒</span>
+        </label>
+        <div class="modal-actions">
+          <button class="primary-button" id="confirmSmartPriceButton" type="button">是的！我了解</button>
+        </div>
       </div>
     </section>
 

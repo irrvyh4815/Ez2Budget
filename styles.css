@@ -91,7 +91,6 @@ h1 {
 
 .topbar-actions,
 .category-actions,
-.template-group,
 .table-actions,
 .toolbar-row {
   display: flex;
@@ -501,7 +500,7 @@ select:focus {
 .bulk-actions-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--line);
@@ -510,6 +509,7 @@ select:focus {
 
 .bulk-actions-bar span {
   margin-right: auto;
+  margin-left: 4px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
@@ -934,6 +934,64 @@ button:disabled {
   box-shadow: 0 20px 60px rgba(5, 20, 18, 0.2);
 }
 
+.smart-price-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 28;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(17, 24, 39, 0.42);
+}
+
+.smart-price-modal[hidden] {
+  display: none;
+}
+
+.smart-price-dialog {
+  width: min(460px, 100%);
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(16, 24, 40, 0.22);
+}
+
+.smart-price-dialog h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.smart-price-dialog p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.7;
+  font-weight: 700;
+}
+
+.modal-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.modal-check input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: var(--accent);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .ai-drawer[hidden] {
   display: none;
 }
@@ -1050,8 +1108,7 @@ button:disabled {
   }
 
   .table-actions,
-  .category-actions,
-  .template-group {
+  .category-actions {
     width: 100%;
   }
 
@@ -1071,6 +1128,7 @@ button:disabled {
 
   .bulk-actions-bar span {
     flex: 1 1 100%;
+    order: -1;
   }
 
   .budget-table-wrap {

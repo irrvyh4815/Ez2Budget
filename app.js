@@ -67,7 +67,7 @@ const defaultState = {
   },
   categories: [...defaultCategories],
   expandedCategories: Object.fromEntries(defaultCategories.map((category) => [category, true])),
-  items: templates.building,
+  items: templates.empty,
 };
 
 const els = {
@@ -76,7 +76,6 @@ const els = {
   backToLibraryButton: document.querySelector("#backToLibraryButton"),
   createBudgetBookButton: document.querySelector("#createBudgetBookButton"),
   newBudgetBookName: document.querySelector("#newBudgetBookName"),
-  newBudgetTemplate: document.querySelector("#newBudgetTemplate"),
   budgetBookName: document.querySelector("#budgetBookName"),
   saveBudgetBookButton: document.querySelector("#saveBudgetBookButton"),
   saveStatus: document.querySelector("#saveStatus"),
@@ -105,6 +104,7 @@ const els = {
   bulkAiButton: document.querySelector("#bulkAiButton"),
   bulkDuplicateButton: document.querySelector("#bulkDuplicateButton"),
   bulkDeleteButton: document.querySelector("#bulkDeleteButton"),
+  clearItemsButton: document.querySelector("#clearItemsButton"),
   selectAllItems: document.querySelector("#selectAllItems"),
   searchInput: document.querySelector("#searchInput"),
   categoryFilter: document.querySelector("#categoryFilter"),
@@ -122,6 +122,9 @@ const els = {
   aiResultText: document.querySelector("#aiResultText"),
   copyAiPromptButton: document.querySelector("#copyAiPromptButton"),
   openAiSearchLink: document.querySelector("#openAiSearchLink"),
+  smartPriceModal: document.querySelector("#smartPriceModal"),
+  skipSmartPriceReminder: document.querySelector("#skipSmartPriceReminder"),
+  confirmSmartPriceButton: document.querySelector("#confirmSmartPriceButton"),
 };
 
 let state = loadState();
@@ -130,6 +133,8 @@ categories = [...state.categories];
 let activeAiIndex = null;
 const selectedItemIds = new Set();
 let saveStatusTimer = null;
+let pendingSmartPriceAction = null;
+const SMART_PRICE_REMINDER_KEY = "ez2budget-smart-price-reminder-dismissed";
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEYS.current)
@@ -744,7 +749,7 @@ function createBudgetBookFromTemplate(templateName, name) {
 
 function createBudgetBookFromLibrary() {
   const name = els.newBudgetBookName.value.trim() || "未命名預算書";
-  createBudgetBookFromTemplate(els.newBudgetTemplate.value, name);
+  createBudgetBookFromTemplate("empty", name);
   els.newBudgetBookName.value = "";
 }
 
@@ -837,6 +842,19 @@ function addCategory() {
   els.newCategoryName.value = "";
   saveState();
   renderCategoryFilter();
+  renderItems();
+}
+
+function clearItems() {
+  if (state.items.length > 0 && !window.confirm("確定清空所有明細？此動作無法復原。")) {
+    return;
+  }
+  state.items = [];
+  state.activeBudgetId = "";
+  selectedItemIds.clear();
+  closeAiDrawer();
+  saveState();
+  renderBudgetBooks();
   renderItems();
 }
 
@@ -963,7 +981,43 @@ function deleteSelectedItems() {
   renderItems();
 }
 
+function shouldSkipSmartPriceReminder() {
+  return localStorage.getItem(SMART_PRICE_REMINDER_KEY) === "true";
+}
+
+function requestSmartPriceConfirmation(action) {
+  if (shouldSkipSmartPriceReminder()) {
+    action();
+    return;
+  }
+  pendingSmartPriceAction = action;
+  els.skipSmartPriceReminder.checked = false;
+  els.smartPriceModal.hidden = false;
+  els.confirmSmartPriceButton.focus();
+}
+
+function confirmSmartPriceReminder() {
+  if (els.skipSmartPriceReminder.checked) {
+    localStorage.setItem(SMART_PRICE_REMINDER_KEY, "true");
+  }
+  const action = pendingSmartPriceAction;
+  pendingSmartPriceAction = null;
+  els.smartPriceModal.hidden = true;
+  if (action) {
+    action();
+  }
+}
+
+function closeSmartPriceReminder() {
+  pendingSmartPriceAction = null;
+  els.smartPriceModal.hidden = true;
+}
+
 function runBulkAiPriceSearch() {
+  requestSmartPriceConfirmation(runBulkAiPriceSearchAfterConfirmation);
+}
+
+function runBulkAiPriceSearchAfterConfirmation() {
   const selected = selectedItems();
   if (selected.length === 0) {
     return;
@@ -987,10 +1041,10 @@ function runBulkAiPriceSearch() {
   ].join("\n\n");
 
   els.aiDrawer.hidden = false;
-  els.aiDrawerTitle.textContent = `批次 AI 詢價 / ${selected.length} 項`;
+  els.aiDrawerTitle.textContent = `批次智慧詢價 / ${selected.length} 項`;
   els.aiPromptOutput.value = prompt;
   els.openAiSearchLink.href = searchUrlForPrompt(prompt);
-  els.aiResultText.textContent = "已顯示批次查價欄位與提示。接上 AI 後端後，可依細項編號逐項回填建議單價。";
+  els.aiResultText.textContent = "已顯示批次查價欄位與提示。接上智慧詢價後端後，可依細項編號逐項回填建議單價。";
   saveState();
   renderItems();
 }
@@ -1014,6 +1068,10 @@ function searchUrlForPrompt(prompt) {
 }
 
 async function runAiPriceSearch(row) {
+  requestSmartPriceConfirmation(() => runAiPriceSearchAfterConfirmation(row));
+}
+
+async function runAiPriceSearchAfterConfirmation(row) {
   updateItem(row);
   const index = Number(row.dataset.index);
   const item = state.items[index];
@@ -1028,7 +1086,7 @@ async function runAiPriceSearch(row) {
   els.aiDrawerTitle.textContent = `${item.category} / ${item.name || "未命名細項"}`;
   els.aiPromptOutput.value = prompt;
   els.openAiSearchLink.href = searchUrlForPrompt(prompt);
-  els.aiResultText.textContent = "正在準備 AI 詢價參考...";
+  els.aiResultText.textContent = "正在準備智慧詢價參考...";
 
   const suggestedInput = row.querySelector(".item-suggested-price");
   const applyButton = row.querySelector(".apply-ai-price");
@@ -1036,7 +1094,7 @@ async function runAiPriceSearch(row) {
   applyButton.hidden = false;
 
   if (!AI_PRICE_ENDPOINT) {
-    els.aiResultText.textContent = "尚未連接 AI 後端；已顯示查價欄位、提示與搜尋連結。接上 EZ2BUDGET_AI_PRICE_ENDPOINT 後，可由後端彙整目前市價並回填建議單價。";
+    els.aiResultText.textContent = "尚未連接智慧詢價後端；已顯示查價欄位、提示與搜尋連結。接上 EZ2BUDGET_AI_PRICE_ENDPOINT 後，可由後端彙整目前市價並回填建議單價。";
     saveState();
     return;
   }
@@ -1058,10 +1116,10 @@ async function runAiPriceSearch(row) {
     }
     item.aiSummary = result.summary || "";
     item.aiUpdatedAt = new Date().toISOString();
-    els.aiResultText.textContent = result.summary || "AI 已回傳建議資料，請檢查來源、規格與日期後再套用。";
+    els.aiResultText.textContent = result.summary || "智慧詢價已回傳建議資料，請檢查來源、規格與日期後再套用。";
     saveState();
   } catch {
-    els.aiResultText.textContent = "AI 詢價端點目前無法使用；請先使用搜尋連結或複製提示到具備網路搜尋能力的 AI 工具。";
+    els.aiResultText.textContent = "智慧詢價端點目前無法使用；請先使用搜尋連結或複製提示到具備網路搜尋能力的工具。";
   }
 }
 
@@ -1578,6 +1636,7 @@ function bindEvents() {
   els.bulkAiButton.addEventListener("click", runBulkAiPriceSearch);
   els.bulkDuplicateButton.addEventListener("click", duplicateSelectedItems);
   els.bulkDeleteButton.addEventListener("click", deleteSelectedItems);
+  els.clearItemsButton.addEventListener("click", clearItems);
   els.saveBudgetBookButton.addEventListener("click", saveBudgetBook);
   els.toggleBudgetBooksButton.addEventListener("click", () => {
     state.budgetBooksExpanded = !state.budgetBooksExpanded;
@@ -1608,6 +1667,12 @@ function bindEvents() {
   els.exportExcelButton.addEventListener("click", exportExcel);
   els.closeAiDrawer.addEventListener("click", closeAiDrawer);
   els.copyAiPromptButton.addEventListener("click", copyAiPrompt);
+  els.confirmSmartPriceButton.addEventListener("click", confirmSmartPriceReminder);
+  els.smartPriceModal.addEventListener("click", (event) => {
+    if (event.target === els.smartPriceModal) {
+      closeSmartPriceReminder();
+    }
+  });
   document.addEventListener("click", (event) => {
     if (!event.target.closest(".export-menu")) {
       closeExportMenu();
@@ -1617,25 +1682,8 @@ function bindEvents() {
     if (event.key === "Escape") {
       closeExportMenu();
       closeActionMenus();
+      closeSmartPriceReminder();
     }
-  });
-
-  document.querySelectorAll("[data-template]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const templateName = button.dataset.template;
-      const templateItems = structuredClone(templates[templateName] || []);
-      categories = normalizeCategories(null, templateItems);
-      state.categories = [...categories];
-      state.items = templateItems.map(normalizeItem);
-      renumberItems();
-      state.expandedCategories = Object.fromEntries(categories.map((category) => [category, true]));
-      state.activeBudgetId = "";
-      selectedItemIds.clear();
-      saveState();
-      closeAiDrawer();
-      renderBudgetBooks();
-      renderItems();
-    });
   });
 }
 
