@@ -24,11 +24,14 @@
         <div class="topbar-actions editor-only">
           <button class="ghost-button" id="backToLibraryButton" type="button">返回列表</button>
           <button class="primary-button" id="saveBudgetBookButton" type="button">儲存預算書</button>
-          <button class="ghost-button" id="importJsonButton" type="button">匯入</button>
-          <button class="ghost-button" id="exportJsonButton" type="button">JSON</button>
-          <button class="ghost-button" id="exportCsvButton" type="button">CSV</button>
-          <button class="primary-button" id="printButton" type="button">列印</button>
-          <input id="jsonFileInput" type="file" accept="application/json" hidden />
+          <span class="save-status" id="saveStatus" aria-live="polite"></span>
+          <div class="export-menu">
+            <button class="primary-button" id="exportMenuButton" type="button" aria-expanded="false">匯出</button>
+            <div class="export-options" id="exportOptions" hidden>
+              <button class="export-option" id="exportPdfButton" type="button">匯出 PDF</button>
+              <button class="export-option" id="exportExcelButton" type="button">匯出 EXCEL</button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -186,7 +189,10 @@
               </thead>
               <tbody id="itemsBody"></tbody>
             </table>
-            <div class="empty-state" id="emptyState">目前沒有符合條件的工項</div>
+            <div class="empty-state" id="emptyState">
+              <span id="emptyStateMessage">目前沒有符合條件的工項</span>
+              <button class="soft-button" id="clearSearchButton" type="button" hidden>清除搜尋</button>
+            </div>
           </div>
         </section>
         </div>

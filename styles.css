@@ -100,6 +100,68 @@ h1 {
   flex-wrap: wrap;
 }
 
+.save-status {
+  min-height: 28px;
+  display: inline-grid;
+  place-items: center;
+  padding: 4px 8px;
+  color: #0f5132;
+  background: var(--success-soft);
+  border: 1px solid #b7dfc6;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 850;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: 0.16s ease;
+}
+
+.save-status:empty {
+  display: none;
+}
+
+.save-status.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.export-menu {
+  position: relative;
+}
+
+.export-options {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  min-width: 150px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 14px 30px rgba(16, 24, 40, 0.14);
+}
+
+.export-options[hidden] {
+  display: none;
+}
+
+.export-option {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  padding: 9px 13px;
+  color: var(--text);
+  background: #fff;
+  text-align: left;
+  font-weight: 850;
+}
+
+.export-option:hover {
+  background: var(--surface-muted);
+}
+
 .workspace {
   display: grid;
   gap: 16px;
@@ -822,6 +884,8 @@ button:disabled {
 
 .empty-state {
   display: none;
+  place-items: center;
+  gap: 12px;
   padding: 34px;
   color: var(--muted);
   text-align: center;
@@ -829,7 +893,11 @@ button:disabled {
 }
 
 .empty-state.is-visible {
-  display: block;
+  display: grid;
+}
+
+.empty-state span {
+  line-height: 1.5;
 }
 
 .ai-inline {
@@ -1031,6 +1099,20 @@ button:disabled {
   .topbar-actions {
     display: grid;
     width: 100%;
+  }
+
+  .save-status {
+    justify-self: stretch;
+  }
+
+  .export-menu,
+  .export-menu .primary-button {
+    width: 100%;
+  }
+
+  .export-options {
+    left: 0;
+    right: 0;
   }
 
   .brand-mark {

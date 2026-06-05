@@ -79,6 +79,7 @@ const els = {
   newBudgetTemplate: document.querySelector("#newBudgetTemplate"),
   budgetBookName: document.querySelector("#budgetBookName"),
   saveBudgetBookButton: document.querySelector("#saveBudgetBookButton"),
+  saveStatus: document.querySelector("#saveStatus"),
   toggleBudgetBooksButton: document.querySelector("#toggleBudgetBooksButton"),
   savedBudgetCount: document.querySelector("#savedBudgetCount"),
   budgetBooksList: document.querySelector("#budgetBooksList"),
@@ -108,11 +109,12 @@ const els = {
   searchInput: document.querySelector("#searchInput"),
   categoryFilter: document.querySelector("#categoryFilter"),
   emptyState: document.querySelector("#emptyState"),
-  exportJsonButton: document.querySelector("#exportJsonButton"),
-  exportCsvButton: document.querySelector("#exportCsvButton"),
-  importJsonButton: document.querySelector("#importJsonButton"),
-  jsonFileInput: document.querySelector("#jsonFileInput"),
-  printButton: document.querySelector("#printButton"),
+  emptyStateMessage: document.querySelector("#emptyStateMessage"),
+  clearSearchButton: document.querySelector("#clearSearchButton"),
+  exportMenuButton: document.querySelector("#exportMenuButton"),
+  exportOptions: document.querySelector("#exportOptions"),
+  exportPdfButton: document.querySelector("#exportPdfButton"),
+  exportExcelButton: document.querySelector("#exportExcelButton"),
   aiDrawer: document.querySelector("#aiDrawer"),
   closeAiDrawer: document.querySelector("#closeAiDrawer"),
   aiDrawerTitle: document.querySelector("#aiDrawerTitle"),
@@ -127,6 +129,7 @@ let budgetBooks = loadBudgetBooks();
 categories = [...state.categories];
 let activeAiIndex = null;
 const selectedItemIds = new Set();
+let saveStatusTimer = null;
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEYS.current)
@@ -421,7 +424,8 @@ function renderCategoryFilter() {
 
 function renderItems() {
   renumberItems();
-  const query = els.searchInput.value.trim().toLowerCase();
+  const queryText = els.searchInput.value.trim();
+  const query = queryText.toLowerCase();
   const selectedCategory = els.categoryFilter.value;
   els.itemsBody.innerHTML = "";
   let visibleCount = 0;
@@ -453,9 +457,38 @@ function renderItems() {
       }
     });
 
-  els.emptyState.classList.toggle("is-visible", visibleCount === 0);
+  updateEmptyState(visibleCount, queryText, selectedCategory);
   updateSelectionControls();
   calculate();
+}
+
+function updateEmptyState(visibleCount, queryText, selectedCategory) {
+  const hasFilter = Boolean(queryText) || selectedCategory !== "all";
+  els.emptyState.classList.toggle("is-visible", visibleCount === 0);
+  els.clearSearchButton.hidden = !hasFilter;
+
+  if (visibleCount > 0) {
+    return;
+  }
+
+  if (state.items.length === 0) {
+    els.emptyStateMessage.textContent = "這份預算書還沒有工項，先新增項目或套用範本。";
+    return;
+  }
+
+  if (hasFilter) {
+    const parts = [];
+    if (queryText) {
+      parts.push(`「${queryText}」`);
+    }
+    if (selectedCategory !== "all") {
+      parts.push(`「${selectedCategory}」`);
+    }
+    els.emptyStateMessage.textContent = `沒有符合 ${parts.join("、")} 的工項。`;
+    return;
+  }
+
+  els.emptyStateMessage.textContent = "目前沒有符合條件的工項。";
 }
 
 function itemMatchesQuery(item, query) {
@@ -627,6 +660,20 @@ function saveBudgetBook() {
   updateRates();
   upsertCurrentBudgetBook(els.budgetBookName.value.trim() || state.project.name.trim() || "未命名預算書");
   hydrateControls();
+  showSaveStatus();
+}
+
+function showSaveStatus() {
+  const time = new Intl.DateTimeFormat("zh-TW", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date());
+  els.saveStatus.textContent = `已儲存 ${time}`;
+  els.saveStatus.classList.add("is-visible");
+  window.clearTimeout(saveStatusTimer);
+  saveStatusTimer = window.setTimeout(() => {
+    els.saveStatus.classList.remove("is-visible");
+  }, 2800);
 }
 
 function loadBudgetBook(id) {
@@ -736,7 +783,8 @@ function addItem(category = defaultCategoryForAdd()) {
     state.expandedCategories[category] = true;
   }
   state.expandedCategories[category] = true;
-  state.items.push({
+  const item = {
+    id: createItemId(),
     code: "",
     category,
     name: "新增細項",
@@ -748,14 +796,35 @@ function addItem(category = defaultCategoryForAdd()) {
     aiPriceVisible: false,
     aiSummary: "",
     aiUpdatedAt: "",
-  });
+  };
+  state.items.push(item);
   renumberItems();
   saveState();
   renderItems();
+  focusItemName(item.id);
 }
 
 function defaultCategoryForAdd() {
   return els.categoryFilter.value !== "all" ? els.categoryFilter.value : (categories[0] || "未分類");
+}
+
+function focusItemName(itemId) {
+  window.requestAnimationFrame(() => {
+    const row = Array.from(document.querySelectorAll(".detail-row")).find((candidate) => candidate.dataset.id === itemId);
+    const input = row?.querySelector(".item-name");
+    if (!input) {
+      return;
+    }
+    input.focus();
+    input.select();
+  });
+}
+
+function clearSearchFilters() {
+  els.searchInput.value = "";
+  els.categoryFilter.value = "all";
+  renderItems();
+  els.searchInput.focus();
 }
 
 function addCategory() {
@@ -1039,32 +1108,289 @@ function download(filename, content, type) {
   URL.revokeObjectURL(url);
 }
 
-function exportJson() {
-  renumberItems();
-  download(`${state.project.budgetName || state.project.name || "ez2budget"}.json`, JSON.stringify(state, null, 2), "application/json");
+function closeExportMenu() {
+  els.exportOptions.hidden = true;
+  els.exportMenuButton.setAttribute("aria-expanded", "false");
 }
 
-function csvCell(value) {
-  const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
+function toggleExportMenu() {
+  const nextHidden = !els.exportOptions.hidden;
+  els.exportOptions.hidden = nextHidden;
+  els.exportMenuButton.setAttribute("aria-expanded", String(!nextHidden));
 }
 
-function exportCsv() {
+function formalFilename(extension) {
+  const name = state.project.budgetName || state.project.name || "Ez2Budget工程預算書";
+  const cleanName = String(name).trim().replace(/[\\/:*?"<>|]/g, "-") || "Ez2Budget工程預算書";
+  return `${cleanName}.${extension}`;
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return new Intl.DateTimeFormat("zh-TW", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function formalReportRows() {
   renumberItems();
-  const header = ["大項", "細項編碼", "細項名稱", "用料/規格", "單位", "預估數量", "單價", "AI建議單價", "複價"];
-  const rows = state.items.map((item) => [
-    item.category,
-    item.code,
-    item.name,
-    item.material,
-    item.unit,
-    item.quantity,
-    item.price,
-    item.aiPriceVisible ? item.aiSuggestedPrice || "" : "",
-    lineTotal(item),
-  ]);
-  const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
-  download(`${state.project.budgetName || state.project.name || "ez2budget"}.csv`, `\ufeff${csv}`, "text/csv;charset=utf-8");
+  return groupItems()
+    .filter(({ items }) => items.length > 0)
+    .map(({ category, items }) => ({
+      category,
+      total: categoryTotal(category),
+      items: items.map(({ item }) => item),
+    }));
+}
+
+function reportTotals() {
+  const direct = directTotal();
+  const fee = direct * ((numberValue(state.rates.overhead) + numberValue(state.rates.profit)) / 100);
+  const contingency = (direct + fee) * (numberValue(state.rates.contingency) / 100);
+  const beforeTax = direct + fee + contingency;
+  const tax = beforeTax * (numberValue(state.rates.tax) / 100);
+  return {
+    direct,
+    fee,
+    contingency,
+    beforeTax,
+    tax,
+    total: beforeTax + tax,
+  };
+}
+
+function buildFormalReportHtml(options = {}) {
+  const includePrintActions = Boolean(options.includePrintActions);
+  const totals = reportTotals();
+  const rows = formalReportRows();
+  const projectTitle = state.project.budgetName || state.project.name || "工程預算書";
+  const detailRows = rows.map(({ category, total, items }) => `
+    <tr class="category-row">
+      <td colspan="6">${escapeHtml(category)}</td>
+      <td>${money(total)}</td>
+    </tr>
+    ${items.map((item) => `
+      <tr>
+        <td>${escapeHtml(item.code)}</td>
+        <td>${escapeHtml(item.name)}</td>
+        <td>${escapeHtml(item.material || "")}</td>
+        <td>${escapeHtml(item.unit)}</td>
+        <td class="number">${decimal(numberValue(item.quantity))}</td>
+        <td class="number">${money(numberValue(item.price))}</td>
+        <td class="number">${money(lineTotal(item))}</td>
+      </tr>
+    `).join("")}
+  `).join("");
+
+  return `<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <title>${escapeHtml(projectTitle)} - 預算書</title>
+    <style>
+      @page { size: A4 portrait; margin: 14mm; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: #111827;
+        background: #fff;
+        font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", Arial, sans-serif;
+        font-size: 12px;
+      }
+      .document { width: 100%; }
+      h1 {
+        margin: 0 0 14px;
+        font-size: 24px;
+        line-height: 1.2;
+        text-align: center;
+        letter-spacing: 0;
+      }
+      .meta-grid {
+        width: 100%;
+        margin-bottom: 14px;
+        border-collapse: collapse;
+      }
+      .meta-grid th,
+      .meta-grid td {
+        border: 1px solid #9ca3af;
+        padding: 7px 8px;
+        text-align: left;
+        vertical-align: middle;
+      }
+      .meta-grid th {
+        width: 86px;
+        background: #f3f4f6;
+        font-weight: 800;
+      }
+      .summary-table,
+      .detail-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .summary-table {
+        margin-bottom: 14px;
+      }
+      .summary-table th,
+      .summary-table td,
+      .detail-table th,
+      .detail-table td {
+        border: 1px solid #9ca3af;
+        padding: 7px 8px;
+        vertical-align: top;
+      }
+      .summary-table th,
+      .detail-table th {
+        background: #e5e7eb;
+        font-weight: 900;
+        text-align: center;
+      }
+      .detail-table thead { display: table-header-group; }
+      .detail-table tr { break-inside: avoid; page-break-inside: avoid; }
+      .category-row td {
+        background: #f3f4f6;
+        font-weight: 900;
+      }
+      .number {
+        text-align: right;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      .total-row td {
+        background: #eef2f7;
+        font-size: 13px;
+        font-weight: 900;
+      }
+      .note {
+        margin-top: 12px;
+        color: #4b5563;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+      ${includePrintActions ? `
+        @media print {
+          .print-actions { display: none; }
+        }
+        .print-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        .print-actions button {
+          min-height: 34px;
+          border: 1px solid #9ca3af;
+          border-radius: 4px;
+          padding: 6px 10px;
+          background: #fff;
+          font: inherit;
+          font-weight: 800;
+          cursor: pointer;
+        }
+      ` : ""}
+    </style>
+  </head>
+  <body>
+    <div class="document">
+      ${includePrintActions ? `<div class="print-actions">
+        <button type="button" onclick="window.print()">列印 / 另存 PDF</button>
+      </div>` : ""}
+      <h1>工程預算書</h1>
+      <table class="meta-grid">
+        <tbody>
+          <tr>
+            <th>預算書</th>
+            <td>${escapeHtml(projectTitle)}</td>
+            <th>編列日期</th>
+            <td>${escapeHtml(formatDate(state.project.date))}</td>
+          </tr>
+          <tr>
+            <th>工程名稱</th>
+            <td>${escapeHtml(state.project.name || "")}</td>
+            <th>業主</th>
+            <td>${escapeHtml(state.project.client || "")}</td>
+          </tr>
+          <tr>
+            <th>工程地點</th>
+            <td colspan="3">${escapeHtml(state.project.location || "")}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>直接工程費</th>
+            <th>間接費與利潤</th>
+            <th>準備金</th>
+            <th>營業稅</th>
+            <th>預算總價</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="number">${money(totals.direct)}</td>
+            <td class="number">${money(totals.fee)}</td>
+            <td class="number">${money(totals.contingency)}</td>
+            <td class="number">${money(totals.tax)}</td>
+            <td class="number"><strong>${money(totals.total)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th style="width: 70px;">編號</th>
+            <th style="width: 22%;">項目名稱</th>
+            <th>規格 / 說明</th>
+            <th style="width: 54px;">單位</th>
+            <th style="width: 80px;">數量</th>
+            <th style="width: 92px;">單價</th>
+            <th style="width: 100px;">複價</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${detailRows || '<tr><td colspan="7" style="text-align: center;">無預算明細</td></tr>'}
+          <tr class="total-row">
+            <td colspan="6">預算總價</td>
+            <td class="number">${money(totals.total)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="note">本文件為工程預算書正式輸出，金額與數量請於送審或簽核前再次核對。</p>
+    </div>
+  </body>
+</html>`;
+}
+
+function exportPdf() {
+  closeExportMenu();
+  const reportWindow = window.open("", "_blank");
+  if (!reportWindow) {
+    alert("瀏覽器封鎖了 PDF 預覽視窗，請允許彈出視窗後再試一次。");
+    return;
+  }
+  reportWindow.document.open();
+  reportWindow.document.write(buildFormalReportHtml({ includePrintActions: true }));
+  reportWindow.document.close();
+  reportWindow.focus();
+  window.setTimeout(() => {
+    reportWindow.print();
+  }, 300);
+}
+
+function exportExcel() {
+  closeExportMenu();
+  const html = buildFormalReportHtml();
+  download(formalFilename("xls"), `\ufeff${html}`, "application/vnd.ms-excel;charset=utf-8");
 }
 
 function importJson(file) {
@@ -1273,17 +1599,24 @@ function bindEvents() {
   });
   els.searchInput.addEventListener("input", renderItems);
   els.categoryFilter.addEventListener("change", renderItems);
-  els.exportJsonButton.addEventListener("click", exportJson);
-  els.exportCsvButton.addEventListener("click", exportCsv);
-  els.printButton.addEventListener("click", () => window.print());
-  els.importJsonButton.addEventListener("click", () => els.jsonFileInput.click());
+  els.clearSearchButton.addEventListener("click", clearSearchFilters);
+  els.exportMenuButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleExportMenu();
+  });
+  els.exportPdfButton.addEventListener("click", exportPdf);
+  els.exportExcelButton.addEventListener("click", exportExcel);
   els.closeAiDrawer.addEventListener("click", closeAiDrawer);
   els.copyAiPromptButton.addEventListener("click", copyAiPrompt);
-  els.jsonFileInput.addEventListener("change", () => {
-    const [file] = els.jsonFileInput.files;
-    if (file) {
-      importJson(file);
-      els.jsonFileInput.value = "";
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".export-menu")) {
+      closeExportMenu();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeExportMenu();
+      closeActionMenus();
     }
   });
 
